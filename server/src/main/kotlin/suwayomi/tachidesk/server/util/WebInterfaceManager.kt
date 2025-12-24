@@ -292,14 +292,6 @@ object WebInterfaceManager {
             }
         }
 
-        val wasPreviousUpdateCheckTriggered =
-            (System.currentTimeMillis() - lastAutomatedUpdate) < updateInterval.inWholeMilliseconds
-        if (!wasPreviousUpdateCheckTriggered) {
-            @OptIn(DelicateCoroutinesApi::class)
-            GlobalScope.launch(Dispatchers.IO) {
-                task()
-            }
-        }
 
         currentUpdateTaskId =
             HAScheduler.scheduleCron(task, "0 */${updateInterval.inWholeHours} * * *", "webUI-update-checker")
@@ -345,9 +337,6 @@ object WebInterfaceManager {
                 return
             }
 
-            if (isAutoUpdateEnabled()) {
-                checkForUpdate(flavor)
-            }
 
             // check if the bundled webUI version is a newer version than the current used version
             // this could be the case in case no compatible webUI version is available and a newer server version was installed
