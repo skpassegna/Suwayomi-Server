@@ -19,6 +19,8 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import java.util.zip.Deflater
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 private val applicationDirs: ApplicationDirs by injectLazy()
 
@@ -52,9 +54,15 @@ class FolderProvider(
     override suspend fun handleSuccessfulDownload() {
         val chapterDir = getChapterDownloadPath(mangaId, chapterId)
         val folder = File(chapterDir)
+        folder.parentFile.mkdirs()
 
         val cacheChapterDir = getChapterCachePath(mangaId, chapterId)
-        File(cacheChapterDir).copyRecursively(folder, true)
+        val cacheFolder = File(cacheChapterDir)
+
+        if (cacheFolder.exists()) {
+            // Files.move is much more efficient than copyRecursively (Atomic on same device)
+            Files.move(cacheFolder.toPath(), folder.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     override fun delete(): Boolean {
