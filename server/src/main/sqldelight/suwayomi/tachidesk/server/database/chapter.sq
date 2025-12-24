@@ -1,0 +1,73 @@
+CREATE TABLE chapter (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    name TEXT NOT NULL,
+    date_upload INTEGER NOT NULL DEFAULT 0,
+    chapter_number REAL NOT NULL DEFAULT -1,
+    scanlator TEXT,
+    `read` INTEGER NOT NULL DEFAULT 0,
+    bookmark INTEGER NOT NULL DEFAULT 0,
+    last_page_read INTEGER NOT NULL DEFAULT 0,
+    last_read_at INTEGER NOT NULL DEFAULT 0,
+    fetched_at INTEGER NOT NULL DEFAULT 0,
+    source_order INTEGER NOT NULL,
+    real_url TEXT,
+    is_downloaded INTEGER NOT NULL DEFAULT 0,
+    page_count INTEGER NOT NULL DEFAULT -1,
+    manga INTEGER NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
+    koreader_hash TEXT
+);
+
+CREATE TABLE chapter_meta (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    `key` TEXT NOT NULL,
+    value TEXT NOT NULL,
+    chapter_ref INTEGER NOT NULL REFERENCES chapter(id) ON DELETE CASCADE
+);
+
+CREATE TABLE page (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    `index` INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    image_url TEXT,
+    chapter INTEGER NOT NULL REFERENCES chapter(id) ON DELETE CASCADE
+);
+
+-- Queries
+getChapterById:
+SELECT * FROM chapter WHERE id = ?;
+
+getChaptersByMangaId:
+SELECT * FROM chapter WHERE manga = ? ORDER BY source_order ASC;
+
+getChapterByUrlAndManga:
+SELECT * FROM chapter WHERE url = ? AND manga = ?;
+
+insertChapter:
+INSERT INTO chapter (url, name, date_upload, chapter_number, scanlator, `read`, bookmark, last_page_read, last_read_at, fetched_at, source_order, real_url, is_downloaded, page_count, manga, koreader_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateChapter:
+UPDATE chapter SET url = ?, name = ?, date_upload = ?, chapter_number = ?, scanlator = ?, `read` = ?, bookmark = ?, last_page_read = ?, last_read_at = ?, fetched_at = ?, source_order = ?, real_url = ?, is_downloaded = ?, page_count = ?, manga = ?, koreader_hash = ?
+WHERE id = ?;
+
+deleteChapter:
+DELETE FROM chapter WHERE id = ?;
+
+getChapterMeta:
+SELECT * FROM chapter_meta WHERE chapter_ref = ?;
+
+insertChapterMeta:
+INSERT INTO chapter_meta (`key`, value, chapter_ref) VALUES (?, ?, ?);
+
+deleteChapterMeta:
+DELETE FROM chapter_meta WHERE chapter_ref = ?;
+
+getPagesByChapterId:
+SELECT * FROM page WHERE chapter = ? ORDER BY `index` ASC;
+
+insertPage:
+INSERT INTO page (`index`, url, image_url, chapter) VALUES (?, ?, ?, ?);
+
+deletePagesByChapterId:
+DELETE FROM page WHERE chapter = ?;

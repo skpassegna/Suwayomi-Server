@@ -37,8 +37,10 @@ import suwayomi.tachidesk.server.util.handler
 import suwayomi.tachidesk.server.util.pathParam
 import suwayomi.tachidesk.server.util.queryParam
 import suwayomi.tachidesk.server.util.withOperation
-import uy.kohesive.injekt.injectLazy
+import suwayomi.tachidesk.server.util.ReactiveImageServer
+import java.io.File
 import kotlin.time.Duration.Companion.days
+
 
 object MangaController {
     private val json: Json by injectLazy()
@@ -105,12 +107,16 @@ object MangaController {
             behaviorOf = { ctx, mangaId ->
                 ctx.getAttribute(Attribute.TachideskUser).requireUser()
                 ctx.future {
-                    future { Manga.getMangaThumbnail(mangaId) }
-                        .thenApply {
-                            ctx.header("content-type", it.second)
-                            val httpCacheSeconds = 1.days.inWholeSeconds
-                            ctx.header("cache-control", "max-age=$httpCacheSeconds")
-                            ctx.result(it.first)
+                    future { Manga.getMangaThumbnailFile(mangaId) }
+                        .thenApply { (fileOrStream, mime) ->
+                            if (fileOrStream is File) {
+                                ReactiveImageServer.streamImage(ctx, fileOrStream, mime)
+                            } else if (fileOrStream is java.io.InputStream) {
+                                ctx.header("content-type", mime)
+                                val httpCacheSeconds = 1.days.inWholeSeconds
+                                ctx.header("cache-control", "max-age=$httpCacheSeconds")
+                                ctx.result(fileOrStream)
+                            }
                         }
                 }
             },
@@ -457,7 +463,9 @@ object MangaController {
             pathParam<Int>("index"),
             queryParam<Boolean?>("updateProgress"),
             queryParam<String?>("format"),
+            queryParam<Int?>("width"),
             queryParam<Boolean?>("opds"),
+
             documentWith = {
                 withOperation {
                     summary("Get a chapter page")
@@ -466,7 +474,7 @@ object MangaController {
                     )
                 }
             },
-            behaviorOf = { ctx, mangaId, chapterIndex, index, updateProgress, format, opds ->
+            behaviorOf = { ctx, mangaId, chapterIndex, index, updateProgress, format, width, opds ->
                 if (opds == true) {
                     ctx.getAttribute(Attribute.TachideskUser).requireUserWithBasicFallback(ctx)
                 } else {
@@ -475,17 +483,21 @@ object MangaController {
 
                 ctx.future {
                     future {
-                        Page.getPageImageServe(
+                        Page.getPageImageFileServe(
                             mangaId = mangaId,
                             chapterIndex = chapterIndex,
                             index = index,
                             format = format,
                         )
-                    }.thenApply {
-                        ctx.header("content-type", it.second)
-                        val httpCacheSeconds = 1.days.inWholeSeconds
-                        ctx.header("cache-control", "max-age=$httpCacheSeconds")
-                        ctx.result(it.first)
+                    }.thenApply { (fileOrStream, mime) ->
+                        if (fileOrStream is File) {
+                            ReactiveImageServer.streamImage(ctx, fileOrStream, mime, width)
+                        } else if (fileOrStream is java.io.InputStream) {
+                            ctx.header("content-type", mime)
+                            val httpCacheSeconds = 1.days.inWholeSeconds
+                            ctx.header("cache-control", "max-age=$httpCacheSeconds")
+                            ctx.result(fileOrStream)
+                        }
 
                         if (updateProgress == true) {
                             val chapterId = Chapter.updateChapterProgress(mangaId, chapterIndex, pageNo = index)
@@ -497,6 +509,7 @@ object MangaController {
                     }
                 }
             },
+
             withResults = {
                 image(HttpStatus.OK)
                 httpCode(HttpStatus.NOT_FOUND)

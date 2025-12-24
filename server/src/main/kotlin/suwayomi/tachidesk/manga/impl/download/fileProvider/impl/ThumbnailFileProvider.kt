@@ -4,6 +4,8 @@ import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.download.fileProvider.DownloadedFilesProvider
 import suwayomi.tachidesk.manga.impl.download.fileProvider.FileDownload0Args
 import suwayomi.tachidesk.manga.impl.download.fileProvider.RetrieveFile0Args
+import suwayomi.tachidesk.manga.impl.download.fileProvider.RetrieveFileFile0Args
+
 import suwayomi.tachidesk.manga.impl.util.getThumbnailDownloadPath
 import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse
 import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getCachedImageResponse
@@ -37,6 +39,21 @@ class ThumbnailFileProvider(
     }
 
     override fun getImage(): RetrieveFile0Args = RetrieveFile0Args(::getImageImpl)
+
+    fun getImageFileImpl(): Pair<Any, String> {
+        val filePathWithoutExt = getThumbnailDownloadPath(mangaId)
+        val filePath = getFilePath()
+
+        if (filePath.isNullOrEmpty()) {
+            throw MissingThumbnailException()
+        }
+
+        val fileType = filePath.substringAfter("$filePathWithoutExt.")
+        return File(filePath) to "image/$fileType"
+    }
+
+    override fun getImageFile(): RetrieveFileFile0Args = RetrieveFileFile0Args(::getImageFileImpl)
+
 
     private suspend fun downloadImpl(): Boolean {
         val isExistingFile = getFilePath() != null

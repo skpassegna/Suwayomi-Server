@@ -1,0 +1,57 @@
+CREATE TABLE track_record (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    manga_id INTEGER NOT NULL REFERENCES manga(id) ON DELETE CASCADE,
+    sync_id INTEGER NOT NULL,
+    remote_id INTEGER NOT NULL,
+    library_id INTEGER,
+    title TEXT NOT NULL,
+    last_chapter_read REAL NOT NULL,
+    total_chapters INTEGER NOT NULL,
+    status INTEGER NOT NULL,
+    score REAL NOT NULL,
+    remote_url TEXT NOT NULL,
+    start_date INTEGER NOT NULL,
+    finish_date INTEGER NOT NULL,
+    private INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE track_search (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    tracker_id INTEGER NOT NULL,
+    remote_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    total_chapters INTEGER NOT NULL,
+    tracking_url TEXT NOT NULL,
+    cover_url TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    publishing_status TEXT NOT NULL,
+    publishing_type TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    library_id INTEGER,
+    last_chapter_read REAL NOT NULL DEFAULT 0.0,
+    status INTEGER NOT NULL DEFAULT 0,
+    score REAL NOT NULL DEFAULT 0.0,
+    started_reading_date INTEGER NOT NULL DEFAULT 0,
+    finished_reading_date INTEGER NOT NULL DEFAULT 0,
+    private INTEGER NOT NULL DEFAULT 0,
+    authors TEXT,
+    artists TEXT
+);
+
+-- Queries
+getTrackRecordsByMangaId:
+SELECT * FROM track_record WHERE manga_id = ?;
+
+insertTrackRecord:
+INSERT INTO track_record (manga_id, sync_id, remote_id, library_id, title, last_chapter_read, total_chapters, status, score, remote_url, start_date, finish_date, private)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+getTrackSearchResultsByTrackerId:
+SELECT * FROM track_search WHERE tracker_id = ?;
+
+clearTrackSearchResults:
+DELETE FROM track_search WHERE tracker_id = ?;
+
+insertTrackSearch:
+INSERT INTO track_search (tracker_id, remote_id, title, total_chapters, tracking_url, cover_url, summary, publishing_status, publishing_type, start_date, library_id, last_chapter_read, status, score, started_reading_date, finished_reading_date, private, authors, artists)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

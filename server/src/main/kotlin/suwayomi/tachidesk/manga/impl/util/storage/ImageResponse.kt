@@ -56,6 +56,15 @@ object ImageResponse {
         fileName: String,
         fetcher: suspend () -> Response,
     ): Pair<InputStream, String> {
+        val (file, mime) = getImageFileResponse(saveDir, fileName, fetcher)
+        return pathToInputStream(file.absolutePath) to mime
+    }
+
+    suspend fun getImageFileResponse(
+        saveDir: String,
+        fileName: String,
+        fetcher: suspend () -> Response,
+    ): Pair<File, String> {
         File(saveDir).mkdirs()
 
         val cachedFile = findFileNameStartingWith(saveDir, fileName)
@@ -63,7 +72,8 @@ object ImageResponse {
 
         // in case the cached file is a ".tmp" file something went wrong with the previous download, and it has to be downloaded again
         if (cachedFile != null && !cachedFile.endsWith(".tmp")) {
-            return getCachedImageResponse(cachedFile, filePath)
+            val fileType = cachedFile.substringAfter("$filePath.")
+            return File(cachedFile) to "image/$fileType"
         }
 
         val response = fetcher()
@@ -76,7 +86,7 @@ object ImageResponse {
                         response.body.byteStream(),
                         response.header("Content-Type"),
                     )
-                return pathToInputStream(actualSavePath) to imageType
+                return File(actualSavePath) to imageType
             } else {
                 throw Exception("request error! ${response.code}")
             }
@@ -88,6 +98,7 @@ object ImageResponse {
             response.closeQuietly()
         }
     }
+
 
     /** Save image safely */
     fun saveImage(

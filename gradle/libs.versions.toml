@@ -17,6 +17,8 @@ xmlserialization = "0.91.3"
 ktlint = "1.8.0"
 koin = "4.1.1"
 moko = "0.25.2"
+sqldelight = "2.2.1"
+
 
 [libraries]
 # Kotlin
@@ -71,6 +73,11 @@ exposed-javatime = { module = "org.jetbrains.exposed:exposed-java-time", version
 postgres = "org.postgresql:postgresql:42.7.8"
 h2 = "com.h2database:h2:1.4.200" # current database driver, can't update to h2 v2 without sql migration
 hikaricp = "com.zaxxer:HikariCP:7.0.2"
+
+sqldelight-jdbc = { module = "app.cash.sqldelight:jdbc-driver", version.ref = "sqldelight" }
+sqldelight-sqlite = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
+sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+
 
 # Exposed Migrations
 exposed-migrations = "com.github.Suwayomi:exposed-migrations:3.8.0"
@@ -189,6 +196,8 @@ moko = { id = "dev.icerock.mobile.multiplatform-resources", version.ref = "moko"
 
 # JTE
 jte = { id = "gg.jte.gradle", version.ref = "jte" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
+
 
 [bundles]
 shared = [

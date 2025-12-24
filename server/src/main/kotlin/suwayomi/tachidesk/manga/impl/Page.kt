@@ -21,8 +21,9 @@ import org.jetbrains.exposed.sql.update
 import suwayomi.tachidesk.graphql.types.DownloadConversion
 import suwayomi.tachidesk.manga.impl.util.getChapterCachePath
 import suwayomi.tachidesk.manga.impl.util.source.GetCatalogueSource.getCatalogueSourceOrStub
-import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getImageResponse
+import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getImageFileResponse
 import suwayomi.tachidesk.manga.impl.util.storage.ImageUtil
+
 import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.PageTable
@@ -78,13 +79,10 @@ object Page {
             }
         val chapterId = chapterEntry[ChapterTable.id].value
 
-        try {
-            if (chapterEntry[ChapterTable.isDownloaded]) {
-                return ChapterDownloadHelper.getImage(mangaId, chapterId, index)
-            }
-        } catch (_: Exception) {
-            // ignore and fetch again
+        if (chapterEntry[ChapterTable.isDownloaded]) {
+            return ChapterDownloadHelper.getImage(mangaId, chapterId, index)
         }
+
 
         val pageEntry =
             transaction {
@@ -139,14 +137,97 @@ object Page {
         }
     }
 
-    suspend fun getPageImageServe(
+    suspend fun getPageImageFile(
+        mangaId: Int,
+        chapterId: Int? = null,
+        chapterIndex: Int? = null,
+        index: Int,
+        progressFlow: ((StateFlow<Int>) -> Unit)? = null,
+    ): Pair<Any, String> {
+        val mangaEntry = transaction { MangaTable.selectAll().where { MangaTable.id eq mangaId }.first() }
+        val chapterEntry =
+            transaction {
+                if (chapterId != null) {
+                    ChapterTable
+                        .selectAll()
+                        .where { ChapterTable.id eq chapterId }
+                        .first()
+                } else {
+                    ChapterTable
+                        .selectAll()
+                        .where { ChapterTable.manga eq mangaId and (ChapterTable.sourceOrder eq chapterIndex!!) }
+                        .first()
+                }
+            }
+        val chapterId = chapterEntry[ChapterTable.id].value
+
+        if (chapterEntry[ChapterTable.isDownloaded]) {
+            return ChapterDownloadHelper.getImageFile(mangaId, chapterId, index)
+        }
+
+
+        val pageEntry =
+            transaction {
+                PageTable
+                    .selectAll()
+                    .where { (PageTable.chapter eq chapterId) }
+                    .orderBy(PageTable.index to SortOrder.ASC)
+                    .limit(1)
+                    .offset(index.toLong())
+                    .first()
+            }
+        val tachiyomiPage =
+            Page(
+                pageEntry[PageTable.index],
+                pageEntry[PageTable.url],
+                pageEntry[PageTable.imageUrl],
+            )
+        progressFlow?.invoke(tachiyomiPage.progress)
+
+        // we treat Local source differently
+        if (mangaEntry[MangaTable.sourceReference] == LocalSource.ID) {
+            // is of archive format
+            if (LocalSource.pageCache.containsKey(chapterEntry[ChapterTable.url])) {
+                val pageStream = LocalSource.pageCache[chapterEntry[ChapterTable.url]]!![index]
+                return pageStream() to (ImageUtil.findImageType { pageStream() }?.mime ?: "image/jpeg")
+            }
+
+            // is of directory format
+            val imageFile = File(tachiyomiPage.imageUrl!!)
+            return imageFile to (ImageUtil.findImageType { imageFile.inputStream() }?.mime ?: "image/jpeg")
+        }
+
+        val source = getCatalogueSourceOrStub(mangaEntry[MangaTable.sourceReference])
+        source as HttpSource
+
+        if (pageEntry[PageTable.imageUrl] == null) {
+            val trueImageUrl = getTrueImageUrl(tachiyomiPage, source)
+            transaction {
+                PageTable.update({ (PageTable.chapter eq chapterId) and (PageTable.index eq index) }) {
+                    it[imageUrl] = trueImageUrl
+                }
+            }
+        }
+
+        val fileName = getPageName(index, chapterEntry[ChapterTable.pageCount])
+
+        val cacheSaveDir = getChapterCachePath(mangaId, chapterId)
+
+        // Note: don't care about invalidating cache because OS cache is not permanent
+        return getImageFileResponse(cacheSaveDir, fileName) {
+            source.getImage(tachiyomiPage)
+        }
+    }
+
+
+    suspend fun getPageImageFileServe(
         mangaId: Int,
         chapterIndex: Int,
         index: Int,
         format: String? = null,
-    ): Pair<InputStream, String> {
-        val (inputStream, mime) =
-            getPageImage(
+    ): Pair<Any, String> {
+        val (fileOrStream, mime) =
+            getPageImageFile(
                 mangaId = mangaId,
                 chapterIndex = chapterIndex,
                 index = index,
@@ -158,7 +239,11 @@ object Page {
             formatConversion
                 ?: conversions[mime]
                 ?: defaultConversion
-                ?: return inputStream to mime
+                ?: return fileOrStream to mime
+
+        // If we are doing conversions, we must use the stream-based approach for now
+        // since our conversion logic returns an InputStream
+        val inputStream = if (fileOrStream is File) fileOrStream.inputStream() else fileOrStream as InputStream
 
         val converted =
             try {
@@ -171,8 +256,15 @@ object Page {
                 logger.error(e) { "Error while post-processing image" }
                 null
             }
-        return converted?.also { inputStream.close() } ?: (inputStream to mime)
+        
+        return if (converted != null) {
+            if (fileOrStream is InputStream) fileOrStream.close()
+            converted
+        } else {
+            fileOrStream to mime
+        }
     }
+
 
     suspend fun getPageImageDownload(
         mangaId: Int,

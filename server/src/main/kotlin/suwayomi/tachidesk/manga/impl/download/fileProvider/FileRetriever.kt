@@ -19,6 +19,24 @@ fun interface RetrieveFile1Args<A> : RetrieveFile {
     override fun executeGetImage(vararg args: Any): Pair<InputStream, String> = execute(args[0] as A)
 }
 
+fun interface RetrieveFileFile {
+    fun executeGetImage(vararg args: Any): Pair<Any, String>
+}
+
+fun interface RetrieveFileFile0Args : RetrieveFileFile {
+    fun execute(): Pair<Any, String>
+
+    override fun executeGetImage(vararg args: Any): Pair<Any, String> = execute()
+}
+
+
+@Suppress("UNCHECKED_CAST")
+fun interface RetrieveFileFile1Args<A> : RetrieveFileFile {
+    fun execute(a: A): Pair<Any, String>
+
+    override fun executeGetImage(vararg args: Any): Pair<Any, String> = execute(args[0] as A)
+}
+
 @Suppress("UNCHECKED_CAST")
 fun interface RetrieveFile2Args<A, B> : RetrieveFile {
     fun execute(
@@ -31,4 +49,5 @@ fun interface RetrieveFile2Args<A, B> : RetrieveFile {
 
 fun interface FileRetriever {
     fun getImage(): RetrieveFile
+    fun getImageFile(): RetrieveFileFile
 }

@@ -43,7 +43,9 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.PageTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.database.DBManager
 import java.time.Instant
+
 import java.util.TreeSet
 import kotlin.math.max
 import kotlin.time.Duration.Companion.minutes
@@ -574,7 +576,13 @@ object Chapter {
     }
 
     fun getChaptersMetaMaps(chapterIds: List<Int>): Map<Int, Map<String, String>> =
-        transaction {
+        DBManager.sqldelightDatabase?.chapterQueries?.let { queries ->
+            chapterIds.associateWith { chapterId ->
+                queries.getChapterMeta(chapterId.toLong())
+                    .executeAsList()
+                    .associate { it.`key` to it.value }
+            }
+        } ?: transaction {
             ChapterMetaTable
                 .selectAll()
                 .where { ChapterMetaTable.ref inList chapterIds }
@@ -583,13 +591,18 @@ object Chapter {
                 .withDefault { emptyMap() }
         }
 
+
     fun getChapterMetaMap(chapter: EntityID<Int>): Map<String, String> =
-        transaction {
-            ChapterMetaTable
-                .selectAll()
-                .where { ChapterMetaTable.ref eq chapter }
-                .associate { it[ChapterMetaTable.key] to it[ChapterMetaTable.value] }
-        }
+        DBManager.sqldelightDatabase?.chapterQueries?.getChapterMeta(chapter.value.toLong())
+            ?.executeAsList()
+            ?.associate { it.`key` to it.value }
+            ?: transaction {
+                ChapterMetaTable
+                    .selectAll()
+                    .where { ChapterMetaTable.ref eq chapter }
+                    .associate { it[ChapterMetaTable.key] to it[ChapterMetaTable.value] }
+            }
+
 
     fun modifyChapterMeta(
         mangaId: Int,

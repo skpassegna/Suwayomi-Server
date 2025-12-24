@@ -292,6 +292,7 @@ object WebInterfaceManager {
             }
         }
 
+        /*
         val wasPreviousUpdateCheckTriggered =
             (System.currentTimeMillis() - lastAutomatedUpdate) < updateInterval.inWholeMilliseconds
         if (!wasPreviousUpdateCheckTriggered) {
@@ -300,6 +301,8 @@ object WebInterfaceManager {
                 task()
             }
         }
+        */
+
 
         currentUpdateTaskId =
             HAScheduler.scheduleCron(task, "0 */${updateInterval.inWholeHours} * * *", "webUI-update-checker")

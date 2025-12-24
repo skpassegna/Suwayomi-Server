@@ -174,6 +174,7 @@ class Updater : IUpdater {
             saveLastAutomatedUpdateTimestamp()
         }
 
+        /*
         val wasPreviousUpdateTriggered =
             System.currentTimeMillis() - (
                 if (!isInitialScheduling) lastAutomatedUpdate else System.currentTimeMillis()
@@ -183,6 +184,7 @@ class Updater : IUpdater {
                 autoUpdateTask()
             }
         }
+        */
 
         currentUpdateTaskId = HAScheduler.schedule(::autoUpdateTask, updateInterval, timeToNextExecution, "global-update")
     }

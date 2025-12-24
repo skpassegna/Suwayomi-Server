@@ -38,8 +38,9 @@ import suwayomi.tachidesk.manga.impl.util.source.GetCatalogueSource.getCatalogue
 import suwayomi.tachidesk.manga.impl.util.source.GetCatalogueSource.getCatalogueSourceOrStub
 import suwayomi.tachidesk.manga.impl.util.source.StubSource
 import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.clearCachedImage
-import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getImageResponse
+import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getImageFileResponse
 import suwayomi.tachidesk.manga.impl.util.storage.ImageUtil
+
 import suwayomi.tachidesk.manga.impl.util.updateMangaDownloadDir
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
 import suwayomi.tachidesk.manga.model.dataclass.IncludeOrExclude
@@ -52,7 +53,9 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.ApplicationDirs
 import uy.kohesive.injekt.injectLazy
+import suwayomi.tachidesk.server.database.DBManager
 import java.io.File
+
 import java.io.IOException
 import java.io.InputStream
 import java.time.Instant
@@ -246,12 +249,16 @@ object Manga {
     )
 
     fun getMangaMetaMap(mangaId: Int): Map<String, String> =
-        transaction {
-            MangaMetaTable
-                .selectAll()
-                .where { MangaMetaTable.ref eq mangaId }
-                .associate { it[MangaMetaTable.key] to it[MangaMetaTable.value] }
-        }
+        DBManager.sqldelightDatabase?.mangaQueries?.getMangaMeta(mangaId.toLong())
+            ?.executeAsList()
+            ?.associate { it.`key` to it.value }
+            ?: transaction {
+                MangaMetaTable
+                    .selectAll()
+                    .where { MangaMetaTable.ref eq mangaId }
+                    .associate { it[MangaMetaTable.key] to it[MangaMetaTable.value] }
+            }
+
 
     fun modifyMangaMeta(
         mangaId: Int,
@@ -365,6 +372,11 @@ object Manga {
     }
 
     suspend fun fetchMangaThumbnail(mangaId: Int): Pair<InputStream, String> {
+        val (fileOrStream, mime) = fetchMangaThumbnailFile(mangaId)
+        return if (fileOrStream is File) fileOrStream.inputStream() to mime else fileOrStream as InputStream to mime
+    }
+
+    suspend fun fetchMangaThumbnailFile(mangaId: Int): Pair<Any, String> {
         val cacheSaveDir = applicationDirs.tempThumbnailCacheRoot
         val fileName = mangaId.toString()
 
@@ -373,7 +385,7 @@ object Manga {
 
         return when (val source = getCatalogueSourceOrStub(sourceId)) {
             is HttpSource -> {
-                getImageResponse(cacheSaveDir, fileName) {
+                getImageFileResponse(cacheSaveDir, fileName) {
                     fetchHttpSourceMangaThumbnail(source, mangaEntry)
                 }
             }
@@ -391,11 +403,11 @@ object Manga {
                 val contentType =
                     ImageUtil.findImageType { imageFile.inputStream() }?.mime
                         ?: "image/jpeg"
-                imageFile.inputStream() to contentType
+                imageFile to contentType
             }
 
             is StubSource -> {
-                getImageResponse(cacheSaveDir, fileName) {
+                getImageFileResponse(cacheSaveDir, fileName) {
                     val thumbnailUrl =
                         mangaEntry[MangaTable.thumbnail_url]
                             ?: throw NullPointerException("No thumbnail found")
@@ -413,19 +425,25 @@ object Manga {
     }
 
     suspend fun getMangaThumbnail(mangaId: Int): Pair<InputStream, String> {
+        val (fileOrStream, mime) = getMangaThumbnailFile(mangaId)
+        return if (fileOrStream is File) fileOrStream.inputStream() to mime else fileOrStream as InputStream to mime
+    }
+
+    suspend fun getMangaThumbnailFile(mangaId: Int): Pair<Any, String> {
         val mangaEntry = transaction { MangaTable.selectAll().where { MangaTable.id eq mangaId }.first() }
 
         if (mangaEntry[MangaTable.inLibrary] && mangaEntry[MangaTable.sourceReference] != LocalSource.ID) {
             return try {
-                ThumbnailDownloadHelper.getImage(mangaId)
+                ThumbnailDownloadHelper.getImageFile(mangaId)
             } catch (_: MissingThumbnailException) {
                 ThumbnailDownloadHelper.download(mangaId)
-                ThumbnailDownloadHelper.getImage(mangaId)
+                ThumbnailDownloadHelper.getImageFile(mangaId)
             }
         }
 
-        return fetchMangaThumbnail(mangaId)
+        return fetchMangaThumbnailFile(mangaId)
     }
+
 
     fun clearThumbnail(mangaId: Int) {
         val fileName = mangaId.toString()
