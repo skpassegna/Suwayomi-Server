@@ -36,26 +36,27 @@ object ExtensionsList {
     var updateMap = ConcurrentHashMap<String, OnlineExtension>()
 
     suspend fun fetchExtensions() {
-        val results =
+        var anySuccess = false
+        val extensions =
             serverConfig.extensionRepos.value.map { repo ->
                 kotlin
                     .runCatching {
                         ExtensionGithubApi.findExtensions(repo.repoUrlReplace())
+                    }.onSuccess {
+                        anySuccess = true
+                    }.onFailure {
+                        logger.warn(it) {
+                            "Failed to fetch extensions for repo: $repo"
+                        }
                     }
             }
+        val foundExtensions = extensions.mapNotNull { it.getOrNull() }.flatten()
 
-        val failedResults = results.filter { it.isFailure }
-        if (failedResults.isNotEmpty()) {
-            failedResults.forEach {
-                logger.warn(it.exceptionOrNull()) {
-                    "Failed to fetch extensions from a repository. Aborting database update to prevent extensions from being marked as obsolete."
-                }
-            }
-            return
+        if (anySuccess) {
+            updateExtensionDatabase(foundExtensions)
+        } else {
+            logger.warn { "Skipping extension database update as no repos could be reached. This prevents data loss during network or SSL issues." }
         }
-
-        val foundExtensions = results.mapNotNull { it.getOrNull() }.flatten()
-        updateExtensionDatabase(foundExtensions)
     }
 
     suspend fun fetchExtensionsCached() {

@@ -28,12 +28,19 @@ import suwayomi.tachidesk.server.util.shutdownApp
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.sql.SQLException
+import suwayomi.tachidesk.server.database.SuwayomiDatabase
+import app.cash.sqldelight.driver.jdbc.asJdbcDriver
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+
 
 object DBManager {
     var db: Database? = null
         private set
+
+    var sqldelightDatabase: SuwayomiDatabase? = null
+        private set
+
 
     @Volatile
     private var hikariDataSource: HikariDataSource? = null
@@ -96,12 +103,10 @@ object DBManager {
                 preserveKeywordCasing = false
             }
 
-        return if (serverConfig.useHikariConnectionPool.value) {
+        val database = if (serverConfig.useHikariConnectionPool.value) {
             // Create a new HikariCP pool
             hikariDataSource = createHikariDataSource()
-
-            return Database
-                .connect(hikariDataSource!!, databaseConfig = dbConfig)
+            Database.connect(hikariDataSource!!, databaseConfig = dbConfig)
         } else {
             when (serverConfig.databaseType.value) {
                 DatabaseType.POSTGRESQL -> {
@@ -122,8 +127,28 @@ object DBManager {
                     )
                 }
             }
-        }.also { db = it }
+        }
+
+        db = database
+        initSqlDelight()
+        return database
     }
+
+    private fun initSqlDelight() {
+        val dataSource = hikariDataSource ?: return
+        val driver = dataSource.asJdbcDriver()
+        sqldelightDatabase = SuwayomiDatabase(driver)
+
+        // Enable WAL mode for H2 if it's being used as a local DB replacement for SQLite
+        if (serverConfig.databaseType.value == DatabaseType.H2) {
+            try {
+                driver.execute(null, "PRAGMA journal_mode=WAL;", 0)
+            } catch (e: Exception) {
+                // Ignore if not supported
+            }
+        }
+    }
+
 
     fun shutdown() {
         hikariDataSource?.close()

@@ -97,6 +97,27 @@ abstract class ChaptersFilesProvider<Type : FileType>(
 
     override fun getImage(): RetrieveFile1Args<Int> = RetrieveFile1Args(::getImageImpl)
 
+    override fun getImageFile(): RetrieveFileFile1Args<Int> = RetrieveFileFile1Args(::getImageFileImpl)
+
+    fun getImageFileImpl(index: Int): Pair<Any, String> {
+        val images = getImageFiles().filter { it.getName() != COMIC_INFO_FILE }.sortedBy { it.getName() }
+
+        if (images.isEmpty()) {
+            throw Exception("no downloaded images found")
+        }
+
+        val image = images[index]
+        val imageFileType = image.getExtension()
+        val mime = MimeUtils.guessMimeTypeFromExtension(imageFileType) ?: "image/$imageFileType"
+
+        return if (image is FileType.RegularFile) {
+            image.file to mime
+        } else {
+            getImageInputStream(image).buffered() to mime
+        }
+    }
+
+
     /**
      * Extract the existing download to the base download folder (see [getChapterDownloadPath])
      */

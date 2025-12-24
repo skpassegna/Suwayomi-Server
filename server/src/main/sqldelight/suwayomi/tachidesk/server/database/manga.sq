@@ -1,0 +1,100 @@
+CREATE TABLE manga (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    initialized INTEGER NOT NULL DEFAULT 0,
+    artist TEXT,
+    author TEXT,
+    description TEXT,
+    genre TEXT,
+    status INTEGER NOT NULL DEFAULT 0,
+    thumbnail_url TEXT,
+    thumbnail_url_last_fetched INTEGER NOT NULL DEFAULT 0,
+    in_library INTEGER NOT NULL DEFAULT 0,
+    in_library_at INTEGER NOT NULL DEFAULT 0,
+    source INTEGER NOT NULL,
+    real_url TEXT,
+    last_fetched_at INTEGER NOT NULL DEFAULT 0,
+    chapters_last_fetched_at INTEGER NOT NULL DEFAULT 0,
+    update_strategy TEXT NOT NULL DEFAULT 'ALWAYS_UPDATE'
+);
+
+CREATE TABLE manga_meta (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    `key` TEXT NOT NULL,
+    value TEXT NOT NULL,
+    manga_ref INTEGER NOT NULL REFERENCES manga(id) ON DELETE CASCADE
+);
+
+CREATE TABLE category (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    include_in_update INTEGER NOT NULL DEFAULT 0,
+    include_in_download INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE category_manga (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    category INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+    manga INTEGER NOT NULL REFERENCES manga(id) ON DELETE CASCADE
+);
+
+CREATE TABLE category_meta (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    `key` TEXT NOT NULL,
+    value TEXT NOT NULL,
+    category_ref INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE
+);
+
+-- Queries
+getMangaById:
+SELECT * FROM manga WHERE id = ?;
+
+getMangaByUrlAndSource:
+SELECT * FROM manga WHERE url = ? AND source = ?;
+
+getInLibraryManga:
+SELECT * FROM manga WHERE in_library = 1;
+
+insertManga:
+INSERT INTO manga (url, title, initialized, artist, author, description, genre, status, thumbnail_url, thumbnail_url_last_fetched, in_library, in_library_at, source, real_url, last_fetched_at, chapters_last_fetched_at, update_strategy)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateManga:
+UPDATE manga SET url = ?, title = ?, initialized = ?, artist = ?, author = ?, description = ?, genre = ?, status = ?, thumbnail_url = ?, thumbnail_url_last_fetched = ?, in_library = ?, in_library_at = ?, source = ?, real_url = ?, last_fetched_at = ?, chapters_last_fetched_at = ?, update_strategy = ?
+WHERE id = ?;
+
+deleteManga:
+DELETE FROM manga WHERE id = ?;
+
+getMangaMeta:
+SELECT * FROM manga_meta WHERE manga_ref = ?;
+
+insertMangaMeta:
+INSERT INTO manga_meta (`key`, value, manga_ref) VALUES (?, ?, ?);
+
+deleteMangaMeta:
+DELETE FROM manga_meta WHERE manga_ref = ?;
+
+getCategories:
+SELECT * FROM category ORDER BY sort_order ASC;
+
+insertCategory:
+INSERT INTO category (name, sort_order, is_default, include_in_update, include_in_download)
+VALUES (?, ?, ?, ?, ?);
+
+deleteCategory:
+DELETE FROM category WHERE id = ?;
+
+getCategoryManga:
+SELECT manga.* FROM manga
+JOIN category_manga ON manga.id = category_manga.manga
+WHERE category_manga.category = ?;
+
+insertCategoryManga:
+INSERT INTO category_manga (category, manga) VALUES (?, ?);
+
+deleteCategoryManga:
+DELETE FROM category_manga WHERE category = ? AND manga = ?;

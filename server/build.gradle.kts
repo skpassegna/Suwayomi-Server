@@ -30,6 +30,7 @@ plugins {
             .get()
             .pluginId,
     )
+    alias(libs.plugins.sqldelight)
 }
 
 dependencies {
@@ -58,6 +59,12 @@ dependencies {
 
     // Exposed Migrations
     implementation(libs.exposed.migrations)
+
+    // SQLDelight
+    implementation(libs.sqldelight.jdbc)
+    implementation(libs.sqldelight.sqlite)
+    implementation(libs.sqldelight.coroutines)
+
 
     // tray icon
     implementation(libs.bundles.systemtray)
@@ -115,6 +122,15 @@ dependencies {
 jte {
     generate()
 }
+
+sqldelight {
+    databases {
+        create("SuwayomiDatabase") {
+            packageName.set("suwayomi.tachidesk.server.database")
+        }
+    }
+}
+
 
 application {
     applicationDefaultJvmArgs =

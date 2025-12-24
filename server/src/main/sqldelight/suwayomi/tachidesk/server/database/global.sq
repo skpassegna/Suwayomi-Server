@@ -1,0 +1,21 @@
+CREATE TABLE global_meta (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    `key` TEXT NOT NULL,
+    value TEXT NOT NULL
+);
+
+-- Queries
+getGlobalMeta:
+SELECT * FROM global_meta;
+
+getGlobalMetaByKey:
+SELECT * FROM global_meta WHERE `key` = ?;
+
+insertGlobalMeta:
+INSERT INTO global_meta (`key`, value) VALUES (?, ?);
+
+updateGlobalMeta:
+UPDATE global_meta SET value = ? WHERE `key` = ?;
+
+deleteGlobalMeta:
+DELETE FROM global_meta WHERE `key` = ?;
