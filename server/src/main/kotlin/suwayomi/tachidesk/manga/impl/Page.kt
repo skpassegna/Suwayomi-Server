@@ -78,12 +78,13 @@ object Page {
             }
         val chapterId = chapterEntry[ChapterTable.id].value
 
-        try {
-            if (chapterEntry[ChapterTable.isDownloaded]) {
-                return ChapterDownloadHelper.getImage(mangaId, chapterId, index)
+        if (chapterEntry[ChapterTable.isDownloaded]) {
+            return try {
+                ChapterDownloadHelper.getImage(mangaId, chapterId, index)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to load downloaded image: mangaId=$mangaId, chapterId=$chapterId, index=$index" }
+                throw Exception("Local image file missing or corrupted for a downloaded chapter. Silent network fallback disabled.")
             }
-        } catch (_: Exception) {
-            // ignore and fetch again
         }
 
         val pageEntry =
